@@ -35,9 +35,18 @@ COL_TELEFONO = "Teléfono o Celular"
 COL_MODALIDAD = "Modalidad de capacitación"
 COL_CIUDAD_VIRTUAL = "¿Desde qué ciudad o municipio se conecta VIRTUALMENTE para recibir las clases?"
 COL_CIUDAD_PRESENCIAL = "¿Desde qué Ciudad se va ha participar PRESENCIALMENTE a las clases?"
+# Estas dos preguntas de "Localidad" SÍ traen datos útiles (a diferencia
+# de las columnas duplicadas del mismo nombre, que quedaron casi vacías
+# porque el formulario las repitió por error). Además, a diferencia de
+# "ciudad", esta pregunta era una lista desplegable de opciones fijas
+# (las 20 localidades oficiales de Bogotá D.C.), así que no trae errores
+# de digitación y no necesita coincidencia aproximada.
+COL_LOCALIDAD_VIRTUAL = "¿Desde qué Localidad va a participar VIRTUALMENTE para recibir las clases?"
+COL_LOCALIDAD_PRESENCIAL = "¿Desde qué Localidad se va a participar PRESENCIALMENTE a las clases?"
 
 MODALIDAD_VIRTUAL = "Virtual"
 MODALIDAD_PRESENCIAL = "Presencial"
+BOGOTA_DC = "Bogotá D.C."
 
 
 def limpiar_telefono(valor: object) -> str | None:
@@ -93,10 +102,13 @@ def descartar_incompletos_y_duplicados(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def construir_columna_ciudad_y_modalidad(df: pd.DataFrame) -> pd.DataFrame:
-    """Crea dos columnas nuevas y sencillas:
+    """Crea columnas nuevas y sencillas:
     - "modalidad": "Virtual" o "Presencial".
     - "ciudad_texto_original": lo que la persona escribió como ciudad,
       tomado de la pregunta virtual o presencial según corresponda.
+    - "localidad": la localidad de Bogotá (si la persona vive en Bogotá
+      y contestó esa pregunta), también elegida entre la versión
+      virtual o presencial según la modalidad.
     """
     df = df.copy()
     df["modalidad"] = df[COL_MODALIDAD].apply(_detectar_modalidad)
@@ -106,7 +118,14 @@ def construir_columna_ciudad_y_modalidad(df: pd.DataFrame) -> pd.DataFrame:
             return fila.get(COL_CIUDAD_PRESENCIAL)
         return fila.get(COL_CIUDAD_VIRTUAL)
 
+    def elegir_localidad(fila):
+        if fila["modalidad"] == MODALIDAD_PRESENCIAL:
+            return fila.get(COL_LOCALIDAD_PRESENCIAL)
+        return fila.get(COL_LOCALIDAD_VIRTUAL)
+
     df["ciudad_texto_original"] = df.apply(elegir_ciudad, axis=1)
+    df["localidad"] = df.apply(elegir_localidad, axis=1)
+    df["localidad"] = df["localidad"].apply(lambda v: str(v).strip() if pd.notna(v) else None)
     return df
 
 
@@ -189,6 +208,22 @@ def agregar_por_departamento(df: pd.DataFrame) -> pd.DataFrame:
     datos = df[df["match_estado"].isin(["ok", "solo_departamento"])]
     conteo = (
         datos.groupby(["departamento", "departamento_codigo"])
+        .size()
+        .reset_index(name="personas")
+        .sort_values("personas", ascending=False)
+        .reset_index(drop=True)
+    )
+    return conteo
+
+
+def agregar_por_localidad_bogota(df: pd.DataFrame) -> pd.DataFrame:
+    """Cuenta cuántas personas hay por localidad, SOLO para quienes
+    quedaron ubicados en Bogotá D.C. y sí contestaron la pregunta de
+    localidad (no todo el mundo la contestó).
+    """
+    datos = df[(df["municipio"] == BOGOTA_DC) & df["localidad"].notna()]
+    conteo = (
+        datos.groupby("localidad")
         .size()
         .reset_index(name="personas")
         .sort_values("personas", ascending=False)

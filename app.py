@@ -26,6 +26,7 @@ import streamlit as st
 from data_loader import RUTA_EXCEL_POR_DEFECTO, load_data
 from procesamiento import (
     agregar_por_departamento,
+    agregar_por_localidad_bogota,
     agregar_por_municipio,
     procesar_inscripciones,
 )
@@ -169,6 +170,26 @@ conteo_departamentos_mapa = todos_los_departamentos.merge(
 )
 conteo_departamentos_mapa["personas"] = conteo_departamentos_mapa["personas"].fillna(0).astype(int)
 
+# Escala de color "secuencial" (un solo tono, de claro a oscuro) para
+# representar una magnitud (cantidad de personas). Se evita a propósito
+# una escala tipo "arcoíris": con una magnitud, el ojo debe poder leer
+# "más oscuro = más personas" sin tener que consultar la leyenda.
+ESCALA_AZUL_SECUENCIAL = [
+    [0 / 12, "#cde2fb"],
+    [1 / 12, "#b7d3f6"],
+    [2 / 12, "#9ec5f4"],
+    [3 / 12, "#86b6ef"],
+    [4 / 12, "#6da7ec"],
+    [5 / 12, "#5598e7"],
+    [6 / 12, "#3987e5"],
+    [7 / 12, "#2a78d6"],
+    [8 / 12, "#256abf"],
+    [9 / 12, "#1c5cab"],
+    [10 / 12, "#184f95"],
+    [11 / 12, "#104281"],
+    [12 / 12, "#0d366b"],
+]
+
 figura_mapa = px.choropleth(
     conteo_departamentos_mapa,
     geojson=geojson_departamentos,
@@ -180,16 +201,72 @@ figura_mapa = px.choropleth(
     # sin errores que un código numérico exacto.
     featureidkey="properties.DPTO",
     color="personas",
-    color_continuous_scale="YlOrRd",
+    color_continuous_scale=ESCALA_AZUL_SECUENCIAL,
     hover_name="departamento",
-    hover_data={"personas": True, "departamento_codigo": False},
-    labels={"personas": "Personas"},
+    custom_data=["personas"],
 )
+
+# hovertemplate personalizado: nombre del departamento en negrita y la
+# cantidad de personas debajo, sin la etiqueta técnica del código DANE.
+figura_mapa.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>%{customdata[0]:,} personas<extra></extra>",
+    marker_line_color="#c3c2b7",  # borde fino y discreto entre departamentos
+    marker_line_width=0.6,
+)
+
 # fitbounds="geojson" (y no "locations") para que siempre se vea el
 # país completo, aunque los datos filtrados solo cubran una región.
-figura_mapa.update_geos(fitbounds="geojson", visible=False)
-figura_mapa.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0}, height=600)
-st.plotly_chart(figura_mapa, use_container_width=True)
+figura_mapa.update_geos(fitbounds="geojson", visible=False, bgcolor="rgba(0,0,0,0)")
+figura_mapa.update_layout(
+    margin={"r": 0, "t": 10, "l": 0, "b": 0},
+    height=600,
+    # Fondo transparente para que el mapa se integre con el tema
+    # (claro u oscuro) de Streamlit en vez de verse como un recuadro
+    # blanco encima de la página.
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font_family="system-ui, -apple-system, 'Segoe UI', sans-serif",
+    coloraxis_colorbar=dict(title="Personas", ticks="outside"),
+)
+st.plotly_chart(figura_mapa, use_container_width=True, config={"displayModeBar": False})
+
+
+# ---------------------------------------------------------------------------
+# DETALLE DE BOGOTÁ D.C. POR LOCALIDAD
+# ---------------------------------------------------------------------------
+# Bogotá concentra la mayoría de inscritos, así que además del mapa por
+# departamento mostramos un desglose por localidad (Chapinero, Suba,
+# Kennedy, etc.). No usamos un mapa aquí porque las localidades son muy
+# pequeñas para verse bien a la escala de un mapa de todo el país; una
+# barra ordenada de mayor a menor es más fácil de leer para este caso.
+conteo_localidades = agregar_por_localidad_bogota(df_filtrado)
+
+if not conteo_localidades.empty:
+    st.subheader("Detalle de Bogotá D.C. por localidad")
+    st.caption(
+        "Solo incluye a las personas de Bogotá que sí contestaron la pregunta "
+        "de localidad en el formulario."
+    )
+    figura_localidades = px.bar(
+        conteo_localidades,
+        x="personas",
+        y="localidad",
+        orientation="h",
+        color_discrete_sequence=["#2a78d6"],  # mismo azul que el mapa
+        labels={"personas": "Personas", "localidad": "Localidad"},
+    )
+    # Ordena las barras de mayor a menor de arriba hacia abajo (por
+    # defecto Plotly las pondría de menor a mayor de arriba hacia abajo).
+    figura_localidades.update_layout(
+        yaxis={"categoryorder": "total ascending"},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_family="system-ui, -apple-system, 'Segoe UI', sans-serif",
+        margin={"r": 10, "t": 10, "l": 0, "b": 0},
+        height=450,
+    )
+    figura_localidades.update_traces(hovertemplate="<b>%{y}</b><br>%{x:,} personas<extra></extra>")
+    st.plotly_chart(figura_localidades, use_container_width=True, config={"displayModeBar": False})
 
 
 # ---------------------------------------------------------------------------
