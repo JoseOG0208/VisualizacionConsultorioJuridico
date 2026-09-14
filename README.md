@@ -46,14 +46,28 @@ reference/                      -> tabla DIVIPOLA (CSV) y GeoJSON de departament
    pip install -r requirements.txt
    ```
 
+   En Windows PowerShell también puede instalar todo sin activar el entorno:
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+   ```
+
 3. Coloque su archivo Excel de inscripción dentro de la carpeta
-   `data/` (o súbalo desde la barra lateral de la app una vez esté
-   corriendo).
+   `data/` (puede conservar el nombre original exportado por Google Forms)
+   o súbalo desde la barra lateral de la app una vez esté corriendo. Si hay
+   un solo archivo `.xlsx` en `data/`, la aplicación lo detectará
+   automáticamente.
 
 4. Ejecute la aplicación:
 
    ```bash
    streamlit run app.py
+   ```
+
+   En Windows PowerShell, si el entorno no está activado:
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m streamlit run app.py
    ```
 
 5. Abra en el navegador la URL que aparece en la terminal

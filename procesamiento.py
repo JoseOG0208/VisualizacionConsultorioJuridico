@@ -174,6 +174,7 @@ def procesar_inscripciones(
     para agregar y graficar, junto con la tabla de valores sin emparejar.
     """
     df = descartar_incompletos_y_duplicados(df_crudo)
+    df["anio"] = pd.to_datetime(df[COL_HORA_INICIO], errors="coerce").dt.year.astype("Int64")
     df[COL_TELEFONO] = df[COL_TELEFONO].apply(limpiar_telefono)
     df = construir_columna_ciudad_y_modalidad(df)
     df, sin_emparejar = aplicar_emparejamiento_municipios(df, municipios)
@@ -213,6 +214,24 @@ def agregar_por_departamento(df: pd.DataFrame) -> pd.DataFrame:
         .sort_values("personas", ascending=False)
         .reset_index(drop=True)
     )
+    return conteo
+
+
+def agregar_por_anio(df: pd.DataFrame) -> pd.DataFrame:
+    """Cuenta las inscripciones depuradas por año.
+
+    El año se obtiene de "Hora de inicio". Las filas sin una fecha válida
+    se excluyen porque no pueden ubicarse correctamente en el eje temporal.
+    """
+    datos = df.dropna(subset=["anio"])
+    conteo = (
+        datos.groupby("anio")
+        .size()
+        .reset_index(name="personas")
+        .sort_values("anio")
+        .reset_index(drop=True)
+    )
+    conteo["anio"] = conteo["anio"].astype(int).astype(str)
     return conteo
 
 

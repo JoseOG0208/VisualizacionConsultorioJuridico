@@ -23,12 +23,30 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from pathlib import Path
 
 import pandas as pd
 
 # Ruta por defecto del archivo Excel dentro del proyecto.
 # Se puede sobreescribir pasando otra ruta a load_data().
 RUTA_EXCEL_POR_DEFECTO = "data/Inscripcion_Nivel_1_Consultorio_Contable.xlsx"
+
+
+def obtener_ruta_excel_disponible() -> str:
+    """Devuelve el Excel configurado o el único Excel disponible en data/.
+
+    Esto permite usar archivos exportados con el nombre original de Google
+    Forms sin obligar a renombrarlos antes de iniciar la aplicación.
+    """
+    ruta_por_defecto = Path(RUTA_EXCEL_POR_DEFECTO)
+    if ruta_por_defecto.is_file():
+        return str(ruta_por_defecto)
+
+    archivos_excel = sorted(Path("data").glob("*.xlsx"))
+    if len(archivos_excel) == 1:
+        return str(archivos_excel[0])
+
+    return RUTA_EXCEL_POR_DEFECTO
 
 
 def _normalizar_nombre_columna(nombre: str) -> str:
